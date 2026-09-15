@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spike Scanner — Binance 5:30 AM Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#060a12;--card:rgba(255,255,255,.02);--border:rgba(255,255,255,.06);
+    --gold:#f0b90b;--green:#22c55e;--red:#ef4444;--text:#e2e8f0;
+    --muted:#64748b;--dim:#475569;--mono:'JetBrains Mono',monospace;--sans:'Inter',system-ui,sans-serif;
+  }
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;padding:20px 16px}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0a0e17}::-webkit-scrollbar-thumb{background:#1e2a3a;border-radius:3px}
+  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes slide-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .wrap{max-width:920px;margin:0 auto}
+
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .logo-row{display:flex;align-items:center;gap:10px}
+  .logo-text{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--gold);letter-spacing:-.5px}
+  .sub{font-size:13px;color:var(--muted);font-family:var(--mono);margin-top:4px}
+  .header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .last-update{font-size:12px;color:var(--muted);display:flex;align-items:center;font-family:var(--mono)}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:#64748b}
+  .dot.live{background:var(--green);animation:pulse-dot 2s infinite}
+
+  .btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#94a3b8;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--mono);transition:all .15s}
+  .btn:hover{background:rgba(255,255,255,.08)}
+  .btn.active{background:rgba(34,197,94,.12);color:var(--green);border-color:rgba(34,197,94,.25)}
+  .btn.danger{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .banner{border-radius:10px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .banner-schedule{background:rgba(240,185,11,.06);border:1px solid rgba(240,185,11,.15)}
+  .banner-baseline{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15)}
+  .banner-nobase{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15)}
+  .banner-icon{font-size:22px}
+  .banner-text{font-size:13px;color:#94a3b8;font-family:var(--mono);flex:1;min-width:200px;line-height:1.5}
+  .banner-text strong{color:var(--gold)}
+  .banner-text .g{color:var(--green)}
+  .banner-text .r{color:var(--red)}
+  .countdown{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:600;white-space:nowrap}
+
+  .controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:14px 16px;background:var(--card);border-radius:10px;border:1px solid rgba(255,255,255,.05)}
+  .ctrl-group{display:flex;flex-direction:column;gap:6px}
+  .ctrl-group.search{flex:1;min-width:140px}
+  .ctrl-label{font-size:10px;font-weight:600;color:var(--dim);letter-spacing:.5px;font-family:var(--mono)}
+  .pills{display:flex;gap:4px;flex-wrap:wrap}
+  .pill{padding:4px 10px;font-size:12px;border-radius:5px;border:1px solid rgba(255,255,255,.06);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--mono);font-weight:500;transition:all .15s}
+  .pill:hover{border-color:rgba(255,255,255,.15)}
+  .pill.on{background:rgba(240,185,11,.12);color:var(--gold);border-color:rgba(240,185,11,.3)}
+  .search-input{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--text);padding:5px 10px;border-radius:5px;font-size:13px;outline:none;font-family:var(--mono);width:100%}
+  .search-input:focus{border-color:rgba(240,185,11,.3)}
+
+  .stats{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .stat{flex:1;min-width:70px;padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid rgba(255,255,255,.04)}
+  .stat-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--gold);display:block}
+  .stat-val.g{color:var(--green)}.stat-val.r{color:var(--red)}.stat-val.sm{font-size:14px}
+  .stat-label{font-size:11px;color:var(--dim);font-weight:500;display:block;margin-top:2px}
+
+  .tabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+  .tab{padding:8px 16px;font-size:13px;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-family:var(--sans)}
+  .tab:hover{color:#94a3b8}
+  .tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+
+  .error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .card{padding:14px 16px;border-radius:10px;border:1px solid var(--border);animation:slide-in .3s ease both}
+  .card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .token-name{font-family:var(--mono);font-size:16px;font-weight:700;color:#f1f5f9}
+  .token-q{font-size:12px;color:var(--dim);font-weight:500}
+  .badge{padding:3px 8px;border-radius:5px;font-size:13px;font-weight:700;font-family:var(--mono)}
+  .badge.up{background:rgba(34,197,94,.15);color:var(--green)}.badge.dn{background:rgba(239,68,68,.15);color:var(--red)}
+
+  .price-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+  .price{font-family:var(--mono);font-size:15px;font-weight:600;color:#cbd5e1}
+  .base-price{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+
+  .meta-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .meta-label{font-size:10px;color:var(--dim);font-family:var(--mono);display:block}
+  .meta-val{font-size:12px;color:#94a3b8;font-family:var(--mono);font-weight:500;display:block}
+
+  .bar-bg{height:3px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+
+  .empty{grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--dim);font-size:14px}
+  .empty small{font-size:13px;opacity:.5}
+
+  .history{display:flex;flex-direction:column;gap:8px}
+  .h-item{padding:12px 16px;border-radius:8px;background:var(--card);border:1px solid rgba(255,255,255,.05)}
+  .h-head{display:flex;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px}
+  .h-time{font-size:12px;color:var(--muted);font-family:var(--mono)}
+  .h-count{font-size:12px;color:var(--gold);font-weight:600;font-family:var(--mono)}
+  .h-tokens{display:flex;gap:10px;flex-wrap:wrap}
+  .h-tok{font-size:12px;font-family:var(--mono);font-weight:600}
+  .h-tok.up{color:var(--green)}.h-tok.dn{color:var(--red)}
+
+  .footer{margin-top:24px;text-align:center;font-size:12px;color:#334155;line-height:1.6;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <div class="logo-row">
+        <svg width="28" height="28" viewBox="0 0 28 28">
+          <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="#f0b90b" stroke-width="1.5"/>
+          <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="#f0b90b" opacity=".15"/>
+          <polygon points="14,10 17,11.75 17,15.25 14,17 11,15.25 11,11.75" fill="#f0b90b"/>
+        </svg>
+        <span class="logo-text">Spike Scanner</span>
+      </div>
+      <div class="sub" id="subline">Binance · USDT pairs · ≥5% since 5:30 AM baseline</div>
+    </div>
+    <div class="header-right">
+      <span class="last-update" id="lastUpdate"></span>
+      <button class="btn" id="btnAuto" onclick="toggleAuto()">Auto 30s</button>
+      <button class="btn" id="btnScan" onclick="fetchCurrent()">Scan Now</button>
+    </div>
+  </div>
+
+  <div id="bannerArea"></div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Quote</span>
+      <div class="pills" id="quotePills"></div>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Spike ≥</span>
+      <div class="pills" id="threshPills"></div>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Sort</span>
+      <div class="pills" id="sortPills"></div>
+    </div>
+    <div class="ctrl-group search">
+      <span class="ctrl-label">Search</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Token name…" oninput="renderCards()">
+    </div>
+  </div>
+
+  <div class="stats" id="statsBar"></div>
+
+  <div class="tabs">
+    <button class="tab on" id="tabLive" onclick="switchView('live')">Live Tracker</button>
+    <button class="tab" id="tabHistory" onclick="switchView('history')">Spike Log</button>
+  </div>
+
+  <div class="error" id="errorBox"></div>
+  <div id="content"></div>
+
+  <div class="footer">
+    Baseline captured at 5:30 AM · All % changes are from that snapshot · Resets every morning
+  </div>
+</div>
+
+<script>
+var SCHED_H = 5, SCHED_M = 30;
+var QUOTES = ['USDT','BUSD','BTC','ETH','BNB'];
+var THRESHOLDS = [2,3,5,10,15,20,30];
+var SORTS = [['change','% Change'],['volume','Volume'],['price','Price']];
+var API = 'https://api.binance.com/api/v3';
+
+var S = {
+  quote:'USDT', threshold:5, sortBy:'change', view:'live',
+  autoRefresh:false, loading:false, lastScan:null,
+  baseline:null, compared:[], spikeLog:[], schedFired:false
+};
+var autoTimer = null;
+
+/* ── persistence ── */
+function saveBase(){ try{localStorage.setItem('spk_base',JSON.stringify(S.baseline))}catch(e){} }
+function loadBase(){ try{var d=localStorage.getItem('spk_base');if(d)S.baseline=JSON.parse(d)}catch(e){} }
+function saveLog(){ try{localStorage.setItem('spk_log',JSON.stringify(S.spikeLog.slice(0,200)))}catch(e){} }
+function loadLog(){ try{var d=localStorage.getItem('spk_log');if(d)S.spikeLog=JSON.parse(d)}catch(e){} }
+
+/* ── helpers ── */
+function fN(n,d){d=d==null?2:d;if(n==null||isNaN(n))return'—';var a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(1)+'B';if(a>=1e6)return(n/1e6).toFixed(1)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return Number(n).toFixed(d)}
+function fP(p){var n=+p;if(isNaN(n))return'—';if(n<.0001)return n.toFixed(8);if(n<.01)return n.toFixed(6);if(n<1)return n.toFixed(4);if(n<100)return n.toFixed(3);return n.toFixed(2)}
+function tAgo(ts){if(!ts)return'';var d=Math.floor((Date.now()-ts)/1000);if(d<60)return d+'s ago';if(d<3600)return Math.floor(d/60)+'m ago';return Math.floor(d/3600)+'h ago'}
+function tKey(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function fTime(ts){return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function baseOK(){return S.baseline&&S.baseline.date===tKey()}
+
+/* ── baseline capture ── */
+function captureBaseline(thenScan){
+  showErr('');
+  S.loading=true; updBtn();
+  fetch(API+'/ticker/price')
+    .then(function(r){if(!r.ok)throw new Error('API '+r.status);return r.json()})
+    .then(function(data){
+      var p={};data.forEach(function(t){p[t.symbol]=+t.price});
+      S.baseline={date:tKey(),time:Date.now(),prices:p};
+      saveBase();
+      S.compared=[];
+      renderAll();
+      if(thenScan) fetchCurrent();
+    })
+    .catch(function(e){showErr('Baseline failed: '+e.message)})
+    .finally(function(){S.loading=false;updBtn()});
+}
+
+/* ── current scan vs baseline ── */
+function fetchCurrent(){
+  if(!baseOK()){captureBaseline(true);return}
+  if(S.loading)return;
+  showErr(''); S.loading=true; updBtn();
+
+  fetch(API+'/ticker/24hr')
+    .then(function(r){if(!r.ok)throw new Error('API '+r.status);return r.json()})
+    .then(function(data){
+      var now=Date.now(), bp=S.baseline.prices, res=[];
+      data.forEach(function(t){
+        if(!t.symbol.endsWith(S.quote))return;
+        var cp=+t.lastPrice, vol=+t.quoteVolume;
+        if(cp<=0||vol<=0)return;
+        var bpr=bp[t.symbol];
+        if(!bpr||bpr<=0)return;
+        res.push({
+          symbol:t.symbol, base:t.symbol.replace(S.quote,''),
+          price:cp, baselinePrice:bpr,
+          change:((cp-bpr)/bpr)*100,
+          volume:vol, trades:+t.count,
+          high:+t.highPrice, low:+t.lowPrice
+        });
+      });
+      S.compared=res; S.lastScan=now;
+
+      // log spikes
+      var spk=res.filter(function(t){return Math.abs(t.change)>=S.threshold});
+      if(spk.length>0){
+        spk.sort(function(a,b){return Math.abs(b.change)-Math.abs(a.change)});
+        S.spikeLog.unshift({
+          time:now, baseTime:S.baseline.time, count:spk.length,
+          threshold:S.threshold, quote:S.quote,
+          top:spk.slice(0,8).map(function(s){return{symbol:s.base,change:s.change,price:s.price,bp:s.baselinePrice}})
+        });
+        if(S.spikeLog.length>200)S.spikeLog=S.spikeLog.slice(0,200);
+        saveLog();
+      }
+      renderAll();
+    })
+    .catch(function(e){showErr('Scan failed: '+e.message)})
+    .finally(function(){S.loading=false;updBtn()});
+}
+
+function resetBaseline(){
+  if(!confirm('Reset baseline now? This captures a new snapshot and clears current tracking.'))return;
+  captureBaseline(true);
+}
+
+/* ── schedule ── */
+function checkSched(){
+  var now=new Date(), h=now.getHours(), m=now.getMinutes();
+  var tgt=new Date(now);tgt.setHours(SCHED_H,SCHED_M,0,0);
+  if(now>=tgt)tgt.setDate(tgt.getDate()+1);
+  var df=tgt-now;
+  var ch=Math.floor(df/3600000),cm=Math.floor((df%3600000)/60000),cs=Math.floor((df%60000)/1000);
+  var el=document.getElementById('countdown');
+  if(el)el.textContent=ch+'h '+cm+'m '+cs+'s';
+
+  if(h===SCHED_H&&m===SCHED_M&&!S.schedFired){
+    S.schedFired=true;
+    captureBaseline(true);
+    try{if(Notification.permission==='granted')new Notification('Spike Scanner',{body:'5:30 AM — Fresh baseline captured!'})}catch(e){}
+  }
+  if(h!==SCHED_H||m!==SCHED_M)S.schedFired=false;
+}
+
+/* ── auto refresh ── */
+function toggleAuto(){
+  S.autoRefresh=!S.autoRefresh;
+  var b=document.getElementById('btnAuto');
+  if(S.autoRefresh){b.classList.add('active');b.textContent='Live ●';autoTimer=setInterval(fetchCurrent,30000)}
+  else{b.classList.remove('active');b.textContent='Auto 30s';clearInterval(autoTimer)}
+  updLast();
+}
+
+/* ── UI ── */
+function showErr(m){var e=document.getElementById('errorBox');if(m){e.textContent=m;e.style.display='block'}else e.style.display='none'}
+function updBtn(){var b=document.getElementById('btnScan');b.textContent=S.loading?'…':'Scan Now';b.disabled=S.loading}
+function updLast(){var e=document.getElementById('lastUpdate');if(!S.lastScan){e.innerHTML='';return}e.innerHTML='<span class="dot'+(S.autoRefresh?' live':'')+'"></span>'+tAgo(S.lastScan)}
+
+function buildPills(){
+  var q='';QUOTES.forEach(function(x){q+='<button class="pill'+(S.quote===x?' on':'')+'" onclick="setQ(\''+x+'\')">'+x+'</button>'});
+  document.getElementById('quotePills').innerHTML=q;
+  var t='';THRESHOLDS.forEach(function(x){t+='<button class="pill'+(S.threshold===x?' on':'')+'" onclick="setT('+x+')">'+x+'%</button>'});
+  document.getElementById('threshPills').innerHTML=t;
+  var s='';SORTS.forEach(function(x){s+='<button class="pill'+(S.sortBy===x[0]?' on':'')+'" onclick="setS(\''+x[0]+'\')">'+x[1]+'</button>'});
+  document.getElementById('sortPills').innerHTML=s;
+  document.getElementById('subline').textContent='Binance · '+S.quote+' pairs · ≥'+S.threshold+'% since 5:30 AM baseline';
+}
+function setQ(v){S.quote=v;buildPills();fetchCurrent()}
+function setT(v){S.threshold=v;buildPills();renderCards()}
+function setS(v){S.sortBy=v;buildPills();renderCards()}
+function switchView(v){
+  S.view=v;
+  document.getElementById('tabLive').className='tab'+(v==='live'?' on':'');
+  document.getElementById('tabHistory').className='tab'+(v==='history'?' on':'');
+  renderCards();
+}
+
+function renderBanner(){
+  var a=document.getElementById('bannerArea'),h='';
+
+  h+='<div class="banner banner-schedule"><span class="banner-icon">⏰</span>';
+  h+='<span class="banner-text">Next baseline reset at <strong>5:30 AM</strong> — all tracking starts fresh.</span>';
+  h+='<span class="countdown" id="countdown"></span></div>';
+
+  if(baseOK()){
+    var cnt=Object.keys(S.baseline.prices).length;
+    h+='<div class="banner banner-baseline"><span class="banner-icon">📸</span>';
+    h+='<span class="banner-text">Baseline: <span class="g"><strong>'+fTime(S.baseline.time)+'</strong></span> · <strong>'+cnt+'</strong> tokens snapshotted. All % changes are from this moment.</span>';
+    h+='<button class="btn danger" onclick="resetBaseline()" style="font-size:11px;padding:4px 10px">Reset Now</button></div>';
+  } else {
+    h+='<div class="banner banner-nobase"><span class="banner-icon">⚠️</span>';
+    h+='<span class="banner-text"><span class="r">No baseline today.</span> Hit <strong>Scan Now</strong> to snapshot prices, or wait for 5:30 AM.</span></div>';
+  }
+  a.innerHTML=h;
+}
+
+function renderStats(){
+  var tk=S.compared, thr=S.threshold;
+  var all=tk.filter(function(t){return Math.abs(t.change)>=thr});
+  var pumps=tk.filter(function(t){return t.change>=thr});
+  var dumps=tk.filter(function(t){return t.change<=-thr});
+  var bg=null,bl=null;
+  tk.forEach(function(t){if(!bg||t.change>bg.change)bg=t;if(!bl||t.change<bl.change)bl=t});
+
+  var h='';
+  h+='<div class="stat"><span class="stat-val">'+all.length+'</span><span class="stat-label">Spikes</span></div>';
+  h+='<div class="stat"><span class="stat-val g">'+pumps.length+'</span><span class="stat-label">Pumps</span></div>';
+  h+='<div class="stat"><span class="stat-val r">'+dumps.length+'</span><span class="stat-label">Dumps</span></div>';
+  h+='<div class="stat" style="flex:2"><span class="stat-val g sm">'+(bg?bg.base+' +'+bg.change.toFixed(1)+'%':'—')+'</span><span class="stat-label">Top Gainer</span></div>';
+  h+='<div class="stat" style="flex:2"><span class="stat-val r sm">'+(bl?bl.base+' '+bl.change.toFixed(1)+'%':'—')+'</span><span class="stat-label">Top Loser</span></div>';
+
+  if(S.baseline){
+    var el=Math.floor((Date.now()-S.baseline.time)/60000);
+    var eh=Math.floor(el/60),em=el%60;
+    h+='<div class="stat"><span class="stat-val sm">'+(eh>0?eh+'h ':'')+em+'m</span><span class="stat-label">Since Base</span></div>';
+  }
+  document.getElementById('statsBar').innerHTML=h;
+  document.getElementById('tabHistory').textContent='Spike Log ('+S.spikeLog.length+')';
+}
+
+function renderCards(){
+  var el=document.getElementById('content');
+  updLast(); renderStats();
+
+  if(S.view==='history'){renderHistory(el);return}
+
+  if(!baseOK()){
+    el.innerHTML='<div class="grid"><div class="empty">No baseline yet for today.<br><small>Hit "Scan Now" to capture a snapshot, or wait for 5:30 AM.</small></div></div>';
+    return;
+  }
+
+  var search=(document.getElementById('searchInput').value||'').toLowerCase();
+  var thr=S.threshold;
+  var vis=S.compared.filter(function(t){
+    if(Math.abs(t.change)<thr)return false;
+    if(search&&t.base.toLowerCase().indexOf(search)===-1)return false;
+    return true;
+  });
+
+  if(S.sortBy==='change')vis.sort(function(a,b){return Math.abs(b.change)-Math.abs(a.change)});
+  else if(S.sortBy==='volume')vis.sort(function(a,b){return b.volume-a.volume});
+  else if(S.sortBy==='price')vis.sort(function(a,b){return b.price-a.price});
+
+  if(!vis.length){
+    el.innerHTML='<div class="grid"><div class="empty">No tokens moved ≥'+thr+'% since baseline.<br><small>Lower the threshold or wait for market action.</small></div></div>';
+    return;
+  }
+
+  var html='<div class="grid">';
+  vis.forEach(function(t,i){
+    var up=t.change>0;
+    var ac=up?'#22c55e':'#ef4444';
+    var bg=up?'rgba(34,197,94,.04)':'rgba(239,68,68,.04)';
+    var int=Math.min(Math.abs(t.change)/50,1);
+    var bc=up?'rgba(34,197,94,'+(0.1+int*.3)+')':'rgba(239,68,68,'+(0.1+int*.3)+')';
+    var ar=up?'▲':'▼', cls=up?'up':'dn';
+    var bW=Math.min(Math.abs(t.change),100);
+    var gr='linear-gradient(90deg,'+ac+'33,'+ac+')';
+    var df=t.price-t.baselinePrice, ds=df>=0?'+':'';
+
+    html+='<div class="card" style="background:'+bg+';border-color:'+bc+';animation-delay:'+(i*.03)+'s">';
+    html+='<div class="card-top"><div><span class="token-name">'+t.base+'</span><span class="token-q">/'+S.quote+'</span></div>';
+    html+='<span class="badge '+cls+'">'+ar+' '+Math.abs(t.change).toFixed(2)+'%</span></div>';
+
+    html+='<div class="price-row"><div><span class="price">$'+fP(t.price)+'</span>';
+    html+='<div class="base-price">5:30 base: $'+fP(t.baselinePrice)+' ('+ds+fP(df)+')</div></div></div>';
+
+    html+='<div class="meta-row">';
+    html+='<div><span class="meta-label">24h Vol</span><span class="meta-val">$'+fN(t.volume)+'</span></div>';
+    html+='<div><span class="meta-label">Trades</span><span class="meta-val">'+fN(t.trades,0)+'</span></div>';
+    html+='<div><span class="meta-label">24h H/L</span><span class="meta-val">'+fP(t.high)+' / '+fP(t.low)+'</span></div>';
+    html+='</div>';
+
+    html+='<div class="bar-bg"><div class="bar-fill" style="width:'+bW+'%;background:'+gr+'"></div></div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function renderHistory(el){
+  if(!S.spikeLog.length){
+    el.innerHTML='<div class="history"><div class="empty">No spikes logged yet. They appear here after each scan.</div></div>';
+    return;
+  }
+  var h='<div class="history">';
+  S.spikeLog.forEach(function(e){
+    h+='<div class="h-item"><div class="h-head">';
+    h+='<span class="h-time">'+fTime(e.time)+' · '+new Date(e.time).toLocaleDateString()+'</span>';
+    h+='<span class="h-count">'+e.count+' spikes (≥'+(e.threshold||5)+'%)</span></div>';
+    h+='<div class="h-tokens">';
+    (e.top||[]).forEach(function(t){
+      var c=t.change>0?'up':'dn', s=t.change>0?'+':'';
+      h+='<span class="h-tok '+c+'">'+t.symbol+' '+s+t.change.toFixed(1)+'%';
+      if(t.bp)h+=' (base $'+fP(t.bp)+')';
+      h+='</span>';
+    });
+    h+='</div></div>';
+  });
+  h+='</div><div style="text-align:center;margin-top:12px">';
+  h+='<button class="btn danger" onclick="clearLog()" style="font-size:11px">Clear Log</button></div>';
+  el.innerHTML=h;
+}
+function clearLog(){if(!confirm('Clear all spike history?'))return;S.spikeLog=[];saveLog();renderCards()}
+
+function renderAll(){renderBanner();buildPills();renderStats();renderCards()}
+
+/* ── init ── */
+loadBase(); loadLog(); renderAll();
+if(baseOK()) fetchCurrent(); else renderAll();
+setInterval(checkSched,1000);
+setInterval(updLast,5000);
+checkSched();
+try{if('Notification'in window&&Notification.permission==='default')Notification.requestPermission()}catch(e){}
+</script>
+</body>
+</html>
