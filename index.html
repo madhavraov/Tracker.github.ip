@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trading Diagnostic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0E131B; --ink-2:#161D28; --ink-3:#212B3A; --ink-line:#2A3546;
+  --paper:#EEF1F3; --paper-2:#E3E8EC; --paper-line:#CBD4DB;
+  --type:#111820; --type-2:#3E4C5A; --type-3:#6B7986; --type-dim:#98A4AF;
+  --crit:#A62B22; --crit-bg:#F7E4E2;
+  --warn:#8A6100; --warn-bg:#F8EEDA;
+  --good:#166B49; --good-bg:#DDEDE5;
+  --cool:#2C5C8A; --cool-bg:#DEE9F2;
+  --up:#2E9E6B; --dn:#C7453B;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --serif:'Spectral',Georgia,serif;
+}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--ink);color:var(--type);font-size:14px;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── Shell ───────────────────────── */
+#app{display:grid;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:stretch;background:var(--ink-2);border-bottom:1px solid var(--ink-line)}
+.brand{display:flex;align-items:center;gap:9px;padding:0 16px;border-right:1px solid var(--ink-line)}
+.brand-mark{width:3px;height:22px;background:var(--up);border-radius:1px}
+.brand-name{font-family:var(--serif);font-size:16px;font-weight:600;color:#E8EDF2;letter-spacing:-.2px}
+.tabs{display:flex}
+.tab{padding:13px 20px;font-size:13px;font-weight:500;color:#8593A3;border-bottom:2px solid transparent;transition:color .15s}
+.tab:hover{color:#C3CDD8}
+.tab[aria-selected="true"]{color:#EEF3F8;border-bottom-color:var(--up);background:var(--ink-3)}
+.topbar-end{margin-left:auto;display:flex;align-items:center;gap:8px;padding:0 14px}
+.view{overflow:hidden;min-height:0}
+.view[hidden]{display:none}
+
+/* ── Chart view ──────────────────── */
+#chartView{display:grid;grid-template-rows:auto auto 1fr auto;background:var(--ink)}
+.ctx{display:flex;gap:0;background:var(--ink-2);border-bottom:1px solid var(--ink-line);overflow-x:auto}
+.ctx-cell{padding:8px 14px;border-right:1px solid var(--ink-line);min-width:142px;flex-shrink:0}
+.ctx-k{font-size:10.5px;color:#7C8A99;margin-bottom:3px}
+.ctx-v{font-family:var(--mono);font-size:14px;font-weight:600;color:#E4EAF0;line-height:1.2}
+.ctx-note{font-size:10.5px;color:#8E9DAC;margin-top:2px;line-height:1.35}
+.ctx-verdict{flex:1;min-width:230px;padding:8px 14px;display:flex;flex-direction:column;justify-content:center}
+
+.bar{display:flex;align-items:center;gap:7px;padding:6px 14px;background:var(--ink);border-bottom:1px solid var(--ink-line);flex-wrap:wrap}
+.sym{background:var(--ink-3);border:1px solid var(--ink-line);border-radius:4px;color:#E4EAF0;padding:5px 9px;font-family:var(--mono);font-size:12.5px;font-weight:600;width:118px}
+.tfs{display:flex;background:var(--ink-3);border-radius:4px;overflow:hidden;border:1px solid var(--ink-line)}
+.tfs button{padding:5px 10px;font-size:11.5px;color:#8593A3}
+.tfs button[aria-pressed="true"]{background:var(--ink-line);color:#EEF3F8}
+.legend{margin-left:auto;display:flex;gap:12px;font-family:var(--mono);font-size:10.5px;color:#7C8A99}
+.legend b{font-weight:500}
+
+.canvas-wrap{position:relative;min-height:0;background:var(--ink)}
+.canvas-wrap canvas{display:block;width:100%;height:100%}
+.readout{position:absolute;top:7px;left:12px;font-family:var(--mono);font-size:11px;color:#C3CDD8;display:flex;gap:9px;pointer-events:none;flex-wrap:wrap;max-width:calc(100% - 100px)}
+.readout i{font-style:normal;color:#6E7D8C}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:9px;background:rgba(14,19,27,.9);color:#98A4AF;font-size:13px;z-index:4}
+.sub{height:92px;border-top:1px solid var(--ink-line);position:relative;background:var(--ink)}
+.sub canvas{display:block;width:100%;height:100%}
+.sub-k{position:absolute;top:6px;left:12px;font-size:10.5px;color:#6E7D8C;pointer-events:none}
+
+/* ── Report view ─────────────────── */
+#reportView{background:var(--paper);overflow-y:auto}
+.report{max-width:760px;margin:0 auto;padding:36px 28px 80px}
+
+.setup{background:#fff;border:1px solid var(--paper-line);border-radius:6px;padding:22px;margin-bottom:26px}
+.setup h2{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:5px;letter-spacing:-.2px}
+.setup p{color:var(--type-2);line-height:1.55;margin-bottom:16px;max-width:64ch}
+.modes{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--paper-line)}
+.modes button{padding:7px 13px;font-size:13px;color:var(--type-3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.modes button[aria-selected="true"]{color:var(--type);border-bottom-color:var(--cool);font-weight:500}
+.field{margin-bottom:11px}
+.field label{display:block;font-size:12.5px;color:var(--type-2);margin-bottom:4px}
+.field input{width:100%;padding:8px 10px;border:1px solid var(--paper-line);border-radius:4px;background:#fff;font-family:var(--mono);font-size:12.5px;color:var(--type)}
+.field input::placeholder{color:var(--type-dim)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+@media(max-width:560px){.row2{grid-template-columns:1fr}}
+.go{background:var(--type);color:#fff;padding:9px 20px;border-radius:4px;font-size:13.5px;font-weight:500;margin-top:6px}
+.go:hover{background:#2A3542}
+.go:disabled{background:var(--type-dim);cursor:wait}
+.note{font-size:12px;color:var(--type-3);line-height:1.5;margin-top:11px;max-width:64ch}
+.note strong{color:var(--type-2);font-weight:600}
+.drop{border:1.5px dashed var(--paper-line);border-radius:5px;padding:26px 16px;text-align:center;color:var(--type-3);font-size:13px;background:#FAFBFC}
+.drop.over{border-color:var(--cool);background:var(--cool-bg)}
+.err{background:var(--crit-bg);border-left:3px solid var(--crit);padding:11px 13px;border-radius:0 4px 4px 0;font-size:12.5px;color:var(--crit);line-height:1.5;margin-top:13px}
+
+/* Verdict hero */
+.hero{margin-bottom:34px;padding-bottom:26px;border-bottom:2px solid var(--type)}
+.hero-eyebrow{font-size:12.5px;color:var(--type-3);margin-bottom:10px}
+.hero-fig{font-family:var(--mono);font-size:clamp(38px,8vw,60px);font-weight:600;line-height:1;letter-spacing:-2px;margin-bottom:12px}
+.hero-say{font-family:var(--serif);font-size:19px;line-height:1.48;color:var(--type);max-width:60ch}
+.hero-say em{font-style:italic}
+
+.vitals{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--paper-line);border:1px solid var(--paper-line);border-radius:5px;overflow:hidden;margin-bottom:34px}
+.vital{background:#fff;padding:12px 13px}
+.vital-k{font-size:11.5px;color:var(--type-3);margin-bottom:5px;line-height:1.3}
+.vital-v{font-family:var(--mono);font-size:19px;font-weight:600;line-height:1.1}
+.vital-n{font-size:11px;color:var(--type-dim);margin-top:3px}
+
+.section-head{font-family:var(--serif);font-size:23px;font-weight:600;margin-bottom:7px;letter-spacing:-.3px}
+.section-sub{color:var(--type-2);font-size:13.5px;line-height:1.55;margin-bottom:22px;max-width:64ch}
+
+.finding{background:#fff;border:1px solid var(--paper-line);border-radius:6px;margin-bottom:14px;overflow:hidden}
+.finding-top{display:flex;gap:13px;padding:16px 18px;align-items:flex-start}
+.sev{width:4px;align-self:stretch;border-radius:2px;flex-shrink:0}
+.finding-body{flex:1;min-width:0}
+.finding-title{font-family:var(--serif);font-size:17.5px;font-weight:600;line-height:1.3;margin-bottom:9px;display:flex;justify-content:space-between;gap:14px;align-items:baseline;flex-wrap:wrap}
+.cost{font-family:var(--mono);font-size:14px;font-weight:600;white-space:nowrap}
+.measure{display:flex;gap:18px;flex-wrap:wrap;padding:9px 12px;background:var(--paper);border-radius:4px;margin-bottom:11px}
+.measure div{min-width:0}
+.measure-k{font-size:11px;color:var(--type-3);margin-bottom:2px}
+.measure-v{font-family:var(--mono);font-size:14.5px;font-weight:600}
+.finding p{font-size:13.5px;line-height:1.6;color:var(--type-2);max-width:64ch;margin-bottom:9px}
+.finding p:last-child{margin-bottom:0}
+.fix{background:var(--good-bg);border-left:3px solid var(--good);padding:11px 13px;border-radius:0 4px 4px 0;margin-top:11px}
+.fix-k{font-size:11.5px;font-weight:600;color:var(--good);margin-bottom:4px}
+.fix p{font-size:13px;color:#1B4536;margin:0;line-height:1.55}
+.clean{background:var(--good-bg);border:1px solid #BEDACD;border-radius:6px;padding:15px 17px;margin-bottom:14px}
+.clean h3{font-family:var(--serif);font-size:16px;color:var(--good);margin-bottom:5px;font-weight:600}
+.clean p{font-size:13px;color:#1B4536;line-height:1.55;margin:0}
+
+table.trades{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border:1px solid var(--paper-line);border-radius:6px;overflow:hidden}
+table.trades th{text-align:left;padding:9px 11px;background:var(--paper-2);font-size:11.5px;font-weight:600;color:var(--type-2);border-bottom:1px solid var(--paper-line)}
+table.trades td{padding:8px 11px;border-bottom:1px solid #EDF0F2;font-family:var(--mono);font-size:12px}
+table.trades tr:last-child td{border-bottom:none}
+.num{text-align:right}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.disc{font-size:11.5px;color:var(--type-dim);line-height:1.55;margin-top:30px;padding-top:16px;border-top:1px solid var(--paper-line);max-width:64ch}
+.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.2);border-top-color:#98A4AF;border-radius:50%;animation:spin .8s linear infinite;display:inline-block}
+.spinner.dark{border-color:rgba(0,0,0,.12);border-top-color:var(--type-3)}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="brand-mark"></div><div class="brand-name">Diagnostic</div></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-view="chartView">Chart</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="reportView">Account review</button>
+    </div>
+    <div class="topbar-end"><span id="clock" style="font-family:var(--mono);font-size:11px;color:#6E7D8C"></span></div>
+  </div>
+
+  <!-- ══ CHART ══ -->
+  <div class="view" id="chartView">
+    <div class="ctx" id="ctx"></div>
+    <div class="bar">
+      <input class="sym" id="symIn" value="SOLUSDT" spellcheck="false" aria-label="Symbol">
+      <div class="tfs" id="tfs">
+        <button data-tf="15m" aria-pressed="false">15m</button>
+        <button data-tf="1h" aria-pressed="false">1h</button>
+        <button data-tf="4h" aria-pressed="true">4h</button>
+        <button data-tf="1d" aria-pressed="false">1d</button>
+      </div>
+      <div class="legend">
+        <span><b style="color:#D9A441">━</b> EMA 50</span>
+        <span><b style="color:#7FA8D9">HH/HL</b> structure</span>
+        <span><b style="color:#2E9E6B">▮</b> vol ≥1.5×</span>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="cwrap">
+      <canvas id="chart"></canvas>
+      <div class="readout" id="readout"></div>
+      <div class="loading" id="loading"><span class="spinner"></span>Loading</div>
+    </div>
+    <div class="sub" id="subWrap">
+      <canvas id="sub"></canvas>
+      <div class="sub-k">Volume against its 20-period average</div>
+    </div>
+  </div>
+
+  <!-- ══ REPORT ══ -->
+  <div class="view" id="reportView" hidden>
+    <div class="report" id="report"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   SHARED
+   ═══════════════════════════════════════════════════════════════ */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const avg=a=>a.length?sum(a)/a.length:0;
+const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const stdev=a=>{if(a.length<2)return 0;const m=avg(a);return Math.sqrt(sum(a.map(x=>(x-m)**2))/(a.length-1));};
+
+function money(n){
+  if(n==null||!isFinite(n))return '—';
+  const s=n<0?'-':'', a=Math.abs(n);
+  return s+'$'+a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function px(p){
+  if(p==null||!isFinite(p))return '—';
+  const a=Math.abs(p);
+  if(a>=1000)return p.toLocaleString('en-US',{maximumFractionDigits:1});
+  if(a>=1)return p.toFixed(3);
+  if(a>=0.01)return p.toFixed(5);
+  return p.toFixed(7);
+}
+function compact(n){
+  const a=Math.abs(n),s=n<0?'-':'';
+  if(a>=1e9)return s+(a/1e9).toFixed(2)+'B';
+  if(a>=1e6)return s+(a/1e6).toFixed(2)+'M';
+  if(a>=1e3)return s+(a/1e3).toFixed(1)+'K';
+  return s+a.toFixed(0);
+}
+function pctStr(n,d=1){return (n>=0?'+':'')+n.toFixed(d)+'%';}
+function dur(ms){
+  const h=ms/36e5;
+  if(h<1)return Math.round(ms/6e4)+'m';
+  if(h<48)return h.toFixed(1)+'h';
+  return (h/24).toFixed(1)+'d';
+}
+async function jget(url,ms=15000){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
+  try{
+    const r=await fetch(url,{signal:c.signal});
+    clearTimeout(t);
+    if(!r.ok){
+      let m='HTTP '+r.status;
+      try{const j=await r.json(); if(j.msg)m=j.msg;}catch(e){}
+      throw new Error(m);
+    }
+    return r.json();
+  }catch(e){clearTimeout(t);throw e;}
+}
+
+/* Tabs */
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  $$('.tab').forEach(o=>o.setAttribute('aria-selected',String(o===t)));
+  $$('.view').forEach(v=>v.hidden = v.id!==t.dataset.view);
+  if(t.dataset.view==='chartView')drawAll();
+}));
+setInterval(()=>{$('#clock').textContent=new Date().toUTCString().slice(17,25)+' UTC';},1000);
+
+/* ═══════════════════════════════════════════════════════════════
+   PART 1 — CHART
+   Indicators: EMA50 regime · ATR yardstick · relative volume ·
+   market structure (HH/HL/LH/LL) · funding · BTC context
+   ═══════════════════════════════════════════════════════════════ */
+const C={sym:'SOLUSDT',tf:'4h',candles:[],zoom:1,off:0,mx:null,my:null,drag:false,dx:0,doff:0,
+  funding:null,btc:null,rotation:null,ws:null};
+
+function parseK(raw){
+  return raw.map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+}
+function ema(vals,p){
+  const out=new Array(vals.length).fill(null);
+  if(vals.length<p)return out;
+  const k=2/(p+1);
+  let e=avg(vals.slice(0,p)); out[p-1]=e;
+  for(let i=p;i<vals.length;i++){e=vals[i]*k+e*(1-k);out[i]=e;}
+  return out;
+}
+function atr14(cs){
+  const out=new Array(cs.length).fill(null);
+  if(cs.length<15)return out;
+  const tr=cs.map((c,i)=>i===0?c.h-c.l:Math.max(c.h-c.l,Math.abs(c.h-cs[i-1].c),Math.abs(c.l-cs[i-1].c)));
+  let a=avg(tr.slice(0,14)); out[13]=a;
+  for(let i=14;i<cs.length;i++){a=(a*13+tr[i])/14;out[i]=a;}
+  return out;
+}
+function relVol(cs,p=20){
+  return cs.map((c,i)=>{
+    if(i<p)return null;
+    const m=avg(cs.slice(i-p,i).map(x=>x.v));
+    return m>0?c.v/m:null;
+  });
+}
+/* Market structure: alternating confirmed swing points */
+function structure(cs,lb=4){
+  const sw=[];
+  for(let i=lb;i<cs.length-lb;i++){
+    let H=true,L=true;
+    for(let j=1;j<=lb;j++){
+      if(cs[i].h<=cs[i-j].h||cs[i].h<=cs[i+j].h)H=false;
+      if(cs[i].l>=cs[i-j].l||cs[i].l>=cs[i+j].l)L=false;
+    }
+    if(H)sw.push({i,p:cs[i].h,k:'H'});
+    else if(L)sw.push({i,p:cs[i].l,k:'L'});
+  }
+  // alternate H/L, keep the extreme of consecutive same-kind
+  const alt=[];
+  for(const s of sw){
+    const last=alt[alt.length-1];
+    if(!last||last.k!==s.k)alt.push(s);
+    else if((s.k==='H'&&s.p>last.p)||(s.k==='L'&&s.p<last.p))alt[alt.length-1]=s;
+  }
+  // label
+  alt.forEach((s,i)=>{
+    const prev=alt.slice(0,i).filter(x=>x.k===s.k).pop();
+    if(!prev){s.label=s.k==='H'?'H':'L';return;}
+    if(s.k==='H')s.label=s.p>prev.p?'HH':'LH';
+    else s.label=s.p>prev.p?'HL':'LL';
+  });
+  const tail=alt.slice(-4);
+  let trend='undecided';
+  const hs=alt.filter(x=>x.k==='H').slice(-2), ls=alt.filter(x=>x.k==='L').slice(-2);
+  if(hs.length===2&&ls.length===2){
+    if(hs[1].p>hs[0].p&&ls[1].p>ls[0].p)trend='uptrend';
+    else if(hs[1].p<hs[0].p&&ls[1].p<ls[0].p)trend='downtrend';
+    else trend='range';
+  }
+  return {swings:alt,trend,tail};
+}
+
+async function loadChart(){
+  $('#loading').style.display='flex';
+  try{
+    C.candles=parseK(await jget(`https://api.binance.com/api/v3/klines?symbol=${C.sym}&interval=${C.tf}&limit=320`));
+    C.off=0;
+    loadContext();
+    drawAll();
+  }catch(e){
+    $('#loading').innerHTML=`<span style="color:#C7453B">${C.sym} didn't load — ${e.message}. Check the ticker spelling.</span>`;
+    return;
+  }
+  $('#loading').style.display='none';
+  connectWS();
+}
+function connectWS(){
+  if(C.ws){try{C.ws.close()}catch(e){}}
+  try{
+    const ws=new WebSocket(`wss://stream.binance.com:9443/ws/${C.sym.toLowerCase()}@kline_${C.tf}`);
+    ws.onmessage=e=>{
+      const k=JSON.parse(e.data).k; if(!k)return;
+      const c={t:k.t,o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v};
+      const L=C.candles[C.candles.length-1];
+      if(L&&L.t===c.t)C.candles[C.candles.length-1]=c;
+      else if(L){C.candles.push(c);if(C.candles.length>320)C.candles.shift();}
+      drawAll();
+    };
+    ws.onclose=()=>{if(C.ws===ws)setTimeout(connectWS,5000);};
+    C.ws=ws;
+  }catch(e){}
+}
+
+/* BTC regime + alt rotation proxy (dominance stand-in) */
+async function loadContext(){
+  const alts=['ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT'];
+  try{
+    const btc=parseK(await jget('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=120'));
+    const e=ema(btc.map(c=>c.c),50);
+    const last=btc[btc.length-1], eLast=e[e.length-1], ePrev=e[e.length-6];
+    C.btc={price:last.c,ema:eLast,above:eLast!=null&&last.c>eLast,
+      slope:(eLast!=null&&ePrev!=null)?(eLast-ePrev)/ePrev*100:0};
+  }catch(e){C.btc=null;}
+  try{
+    const t=await jget('https://api.binance.com/api/v3/ticker/24hr');
+    const map={}; t.forEach(x=>{map[x.symbol]=+x.priceChangePercent;});
+    const b=map['BTCUSDT'];
+    const a=avg(alts.map(s=>map[s]).filter(x=>x!=null));
+    if(b!=null&&isFinite(a))C.rotation={btc:b,alts:a,spread:a-b};
+  }catch(e){C.rotation=null;}
+  try{ C.funding=await jget(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${C.sym}`); }
+  catch(e){ C.funding=null; }
+  drawContext();
+}
+function drawContext(){
+  const cs=C.candles;
+  const A=cs.length?atr14(cs):[], atr=A.length?A[A.length-1]:null;
+  const last=cs.length?cs[cs.length-1]:null;
+  const atrPct=(atr&&last)?atr/last.c*100:null;
+  const candlePct=last?Math.abs(last.c-last.o)/last.o*100:null;
+  const atrMult=(candlePct!=null&&atrPct)?candlePct/atrPct:null;
+  const rv=cs.length?relVol(cs):[], rvLast=rv.length?rv[rv.length-1]:null;
+  const st=cs.length>30?structure(cs):{trend:'undecided'};
+  const e50=cs.length?ema(cs.map(c=>c.c),50):[];
+  const above=(last&&e50.length&&e50[e50.length-1]!=null)?last.c>e50[e50.length-1]:null;
+
+  const fr=C.funding&&C.funding.lastFundingRate!=null?+C.funding.lastFundingRate*100:null;
+  const rot=C.rotation;
+
+  let altGate='—', altNote='', altCol='#8E9DAC';
+  if(C.btc&&rot){
+    const btcOK=C.btc.above&&C.btc.slope>-0.3;
+    const rotOK=rot.spread>-0.5;
+    if(btcOK&&rotOK){altGate='Open';altCol='#5EC79A';altNote='BTC holding its 50 EMA and alts keeping pace. Conditions favour alt longs.';}
+    else if(!btcOK&&!rotOK){altGate='Shut';altCol='#E07A72';altNote='BTC below its 50 EMA and alts lagging it. This is where long-only alt accounts bleed.';}
+    else if(!btcOK){altGate='Shut';altCol='#E07A72';altNote='BTC is under its 50 EMA. Alt longs fight the index here.';}
+    else {altGate='Caution';altCol='#E0B45E';altNote='BTC is fine but money is rotating into it, not out. Alts underperform in this state.';}
+  }
+
+  const cell=(k,v,n,col)=>`<div class="ctx-cell"><div class="ctx-k">${k}</div>
+    <div class="ctx-v"${col?` style="color:${col}"`:''}>${v}</div>${n?`<div class="ctx-note">${n}</div>`:''}</div>`;
+
+  $('#ctx').innerHTML =
+    `<div class="ctx-verdict" style="border-right:1px solid var(--ink-line)">
+      <div class="ctx-k">Alt long conditions</div>
+      <div class="ctx-v" style="font-size:19px;color:${altCol}">${altGate}</div>
+      <div class="ctx-note">${altNote||'Loading market context.'}</div>
+    </div>`
+    + cell('BTC vs 50 EMA', C.btc?(C.btc.above?'Above':'Below'):'—',
+        C.btc?`slope ${pctStr(C.btc.slope,2)} over 5 bars`:'', C.btc?(C.btc.above?'#5EC79A':'#E07A72'):null)
+    + cell('Alts vs BTC (24h)', rot?pctStr(rot.spread,2):'—',
+        rot?`alts ${pctStr(rot.alts,2)} · btc ${pctStr(rot.btc,2)}`:'', rot?(rot.spread>0?'#5EC79A':'#E07A72'):null)
+    + cell('Structure', st.trend.charAt(0).toUpperCase()+st.trend.slice(1),
+        'from confirmed swing points', st.trend==='uptrend'?'#5EC79A':st.trend==='downtrend'?'#E07A72':'#E0B45E')
+    + cell('Price vs 50 EMA', above==null?'—':(above?'Above':'Below'),
+        'regime filter', above==null?null:(above?'#5EC79A':'#E07A72'))
+    + cell('ATR (14)', atrPct?atrPct.toFixed(2)+'%':'—',
+        atrPct?`a normal bar moves ${atrPct.toFixed(2)}%`:'')
+    + cell('This bar', atrMult?atrMult.toFixed(2)+'× ATR':'—',
+        atrMult?(atrMult<0.7?'smaller than routine — not a signal':atrMult>2.5?'far beyond normal — late':'within normal range'):'',
+        atrMult?(atrMult>2.5?'#E0B45E':'#C3CDD8'):null)
+    + cell('Relative volume', rvLast?rvLast.toFixed(2)+'×':'—',
+        rvLast?(rvLast>=1.5?'real participation':rvLast<0.7?'drifting on nothing':'ordinary'):'',
+        rvLast?(rvLast>=1.5?'#5EC79A':rvLast<0.7?'#E07A72':null):null)
+    + cell('Funding', fr!=null?fr.toFixed(4)+'%':'n/a',
+        fr!=null?(fr>0.05?'crowd already long and paying':fr<-0.05?'crowd already short':'no crowding'):'futures feed blocked',
+        fr!=null?(Math.abs(fr)>0.05?'#E0B45E':'#5EC79A'):null);
+}
+
+function drawAll(){drawChart();drawSub();drawContext();}
+
+function drawChart(){
+  const cv=$('#chart'),wrap=$('#cwrap');
+  const dpr=devicePixelRatio||1,W=wrap.clientWidth,H=wrap.clientHeight;
+  if(W<10||H<10)return;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#0E131B';g.fillRect(0,0,W,H);
+  const cs=C.candles; if(!cs.length)return;
+
+  const P={t:10,r:66,b:20,l:6};
+  const cw=clamp(8*C.zoom,2.5,24);
+  const vis=Math.max(20,Math.floor((W-P.l-P.r)/cw));
+  C.off=clamp(C.off,0,Math.max(0,cs.length-vis));
+  const s=Math.max(0,cs.length-vis-C.off), e=Math.min(cs.length,s+vis);
+  const sl=cs.slice(s,e); if(!sl.length)return;
+
+  let hi=-Infinity,lo=Infinity;
+  sl.forEach(c=>{if(c.h>hi)hi=c.h;if(c.l<lo)lo=c.l;});
+  const em=ema(cs.map(c=>c.c),50).slice(s,e).filter(v=>v!=null);
+  em.forEach(v=>{if(v>hi)hi=v;if(v<lo)lo=v;});
+  const pad=(hi-lo)*.07;hi+=pad;lo-=pad;
+  if(hi<=lo)hi=lo+1;
+
+  const cH=H-P.t-P.b;
+  const Y=p=>P.t+(1-(p-lo)/(hi-lo))*cH;
+  const X=i=>P.l+i*cw+cw/2;
+  const bw=cw*.68;
+
+  g.strokeStyle='#1A2230';g.lineWidth=.5;
+  for(let i=0;i<=5;i++){
+    const y=P.t+cH/5*i;
+    g.beginPath();g.moveTo(P.l,y);g.lineTo(W-P.r,y);g.stroke();
+    g.fillStyle='#5B6979';g.font='10px "IBM Plex Mono"';g.textAlign='left';
+    g.fillText(px(hi-(hi-lo)*(i/5)),W-P.r+6,y+3);
+  }
+
+  // EMA 50
+  const e50=ema(cs.map(c=>c.c),50).slice(s,e);
+  g.strokeStyle='#D9A441';g.lineWidth=1.3;g.beginPath();let on=false;
+  e50.forEach((v,i)=>{if(v==null)return;const x=X(i),y=Y(v);on?g.lineTo(x,y):(g.moveTo(x,y),on=true);});
+  g.stroke();
+
+  // relative volume for candle emphasis
+  const rv=relVol(cs).slice(s,e);
+  const A=atr14(cs).slice(s,e);
+
+  sl.forEach((c,i)=>{
+    const x=X(i),up=c.c>=c.o;
+    const strong=rv[i]!=null&&rv[i]>=1.5;
+    const weak=rv[i]!=null&&rv[i]<0.7;
+    let col=up?'#2E9E6B':'#C7453B';
+    g.globalAlpha=weak?0.42:1;
+    g.strokeStyle=col;g.lineWidth=1;
+    g.beginPath();g.moveTo(x,Y(c.h));g.lineTo(x,Y(c.l));g.stroke();
+    const bt=Y(Math.max(c.o,c.c)),bb=Y(Math.min(c.o,c.c));
+    g.fillStyle=col;g.fillRect(x-bw/2,bt,bw,Math.max(1,bb-bt));
+    if(strong){g.globalAlpha=1;g.strokeStyle=up?'#7FE3B4':'#F09088';g.lineWidth=1;
+      g.strokeRect(x-bw/2-1,bt-1,bw+2,Math.max(1,bb-bt)+2);}
+    g.globalAlpha=1;
+  });
+
+  // structure labels
+  if(cs.length>30){
+    const st=structure(cs);
+    st.swings.forEach(sw=>{
+      if(sw.i<s||sw.i>=e)return;
+      const x=X(sw.i-s),y=Y(sw.p);
+      const bull=sw.label==='HH'||sw.label==='HL';
+      g.fillStyle=bull?'#7FA8D9':'#D98C7F';
+      g.font='600 9px "IBM Plex Sans"';g.textAlign='center';
+      g.fillText(sw.label, x, sw.k==='H'?y-7:y+14);
+      g.fillStyle=bull?'#7FA8D9':'#D98C7F';
+      g.beginPath();g.arc(x,y,2,0,7);g.fill();
+    });
+  }
+
+  // last price
+  const L=sl[sl.length-1],ly=Y(L.c),lc=L.c>=L.o?'#2E9E6B':'#C7453B';
+  g.setLineDash([2,3]);g.strokeStyle=lc+'AA';g.lineWidth=1;
+  g.beginPath();g.moveTo(P.l,ly);g.lineTo(W-P.r,ly);g.stroke();g.setLineDash([]);
+  g.fillStyle=lc;g.fillRect(W-P.r,ly-8,P.r-2,16);
+  g.fillStyle='#0E131B';g.font='600 10px "IBM Plex Mono"';g.textAlign='left';
+  g.fillText(px(L.c),W-P.r+4,ly+3.5);
+
+  // ATR band around last close — the yardstick made visual
+  const atrNow=A[A.length-1];
+  if(atrNow){
+    g.fillStyle='rgba(217,164,65,.07)';
+    g.fillRect(P.l,Y(L.c+atrNow),W-P.r-P.l,Y(L.c-atrNow)-Y(L.c+atrNow));
+    g.strokeStyle='rgba(217,164,65,.28)';g.lineWidth=.6;g.setLineDash([3,4]);
+    g.beginPath();g.moveTo(P.l,Y(L.c+atrNow));g.lineTo(W-P.r,Y(L.c+atrNow));g.stroke();
+    g.beginPath();g.moveTo(P.l,Y(L.c-atrNow));g.lineTo(W-P.r,Y(L.c-atrNow));g.stroke();
+    g.setLineDash([]);
+    g.fillStyle='#8A7440';g.font='9px "IBM Plex Mono"';g.textAlign='left';
+    g.fillText('±1 ATR',P.l+4,Y(L.c+atrNow)-4);
+  }
+
+  // crosshair
+  let hov=-1;
+  if(C.mx!=null&&!C.drag){
+    sl.forEach((c,i)=>{const x=X(i);if(C.mx>=x-cw/2&&C.mx<x+cw/2)hov=i;});
+    if(C.mx>P.l&&C.mx<W-P.r&&C.my>P.t&&C.my<H-P.b){
+      g.strokeStyle='#33415A';g.lineWidth=.5;g.setLineDash([2,2]);
+      g.beginPath();g.moveTo(C.mx,P.t);g.lineTo(C.mx,H-P.b);g.stroke();
+      g.beginPath();g.moveTo(P.l,C.my);g.lineTo(W-P.r,C.my);g.stroke();g.setLineDash([]);
+      const cp=hi-(C.my-P.t)/cH*(hi-lo);
+      g.fillStyle='#2A3546';g.fillRect(W-P.r,C.my-8,P.r-2,16);
+      g.fillStyle='#C3CDD8';g.font='10px "IBM Plex Mono"';
+      g.fillText(px(cp),W-P.r+4,C.my+3.5);
+    }
+  }
+
+  // time axis
+  const step=Math.max(1,Math.floor(sl.length/6));
+  for(let i=0;i<sl.length;i+=step){
+    const d=new Date(sl[i].t);
+    const lbl=C.tf==='1d'?`${d.getMonth()+1}/${d.getDate()}`:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}h`;
+    g.fillStyle='#5B6979';g.font='9px "IBM Plex Mono"';g.textAlign='center';
+    g.fillText(lbl,X(i),H-P.b+13);
+  }
+
+  // readout
+  const rc=hov>=0?sl[hov]:L;
+  const rcA=hov>=0?A[hov]:atrNow;
+  const rcRV=hov>=0?rv[hov]:rv[rv.length-1];
+  const movePct=Math.abs(rc.c-rc.o)/rc.o*100;
+  const inATR=rcA?movePct/(rcA/rc.c*100):null;
+  const col=rc.c>=rc.o?'#4FBE8C':'#DD6B62';
+  $('#readout').innerHTML=
+    `<span><i>O</i> <b style="color:${col}">${px(rc.o)}</b></span>
+     <span><i>H</i> <b style="color:${col}">${px(rc.h)}</b></span>
+     <span><i>L</i> <b style="color:${col}">${px(rc.l)}</b></span>
+     <span><i>C</i> <b style="color:${col}">${px(rc.c)}</b></span>
+     <span><i>move</i> <b>${movePct.toFixed(2)}%</b></span>
+     <span><i>in ATR</i> <b style="color:${inATR&&inATR>2.5?'#E0B45E':'#C3CDD8'}">${inATR?inATR.toFixed(2)+'×':'—'}</b></span>
+     <span><i>rel vol</i> <b style="color:${rcRV>=1.5?'#4FBE8C':rcRV<0.7?'#DD6B62':'#C3CDD8'}">${rcRV?rcRV.toFixed(2)+'×':'—'}</b></span>`;
+}
+
+function drawSub(){
+  const cv=$('#sub'),wrap=$('#subWrap');
+  const dpr=devicePixelRatio||1,W=wrap.clientWidth,H=wrap.clientHeight;
+  if(W<10||H<10)return;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#0E131B';g.fillRect(0,0,W,H);
+  const cs=C.candles; if(!cs.length)return;
+
+  const P={t:22,r:66,b:6,l:6};
+  const cw=clamp(8*C.zoom,2.5,24);
+  const vis=Math.max(20,Math.floor((W-P.l-P.r)/cw));
+  const s=Math.max(0,cs.length-vis-C.off), e=Math.min(cs.length,s+vis);
+  const rv=relVol(cs).slice(s,e);
+  const sl=cs.slice(s,e);
+  const cH=H-P.t-P.b;
+  const maxR=Math.max(3,...rv.filter(x=>x!=null));
+  const Y=v=>P.t+(1-v/maxR)*cH;
+  const bw=cw*.68;
+
+  // reference lines at 1.5x and 0.7x — the two thresholds that matter
+  [[1.5,'#2E9E6B','1.5× real participation'],[1,'#3A4658',''],[0.7,'#C7453B','0.7× drifting']].forEach(([lvl,col,lbl])=>{
+    const y=Y(lvl); if(y<P.t||y>H-P.b)return;
+    g.strokeStyle=col+'55';g.lineWidth=.8;g.setLineDash([4,4]);
+    g.beginPath();g.moveTo(P.l,y);g.lineTo(W-P.r,y);g.stroke();g.setLineDash([]);
+    g.fillStyle=col+'CC';g.font='9px "IBM Plex Mono"';g.textAlign='left';
+    g.fillText(lvl+'×',W-P.r+6,y+3);
+    if(lbl){g.fillStyle='#5B6979';g.font='9px "IBM Plex Sans"';g.fillText(lbl,P.l+4,y-3);}
+  });
+
+  rv.forEach((v,i)=>{
+    if(v==null)return;
+    const x=P.l+i*cw+cw/2;
+    const up=sl[i].c>=sl[i].o;
+    const col=v>=1.5?(up?'#2E9E6B':'#C7453B'):v<0.7?'#3E4C5A':(up?'#256F4E':'#8E3730');
+    g.fillStyle=col;
+    const y=Y(Math.min(v,maxR));
+    g.fillRect(x-bw/2,y,bw,H-P.b-y);
+  });
+}
+
+/* chart interaction */
+(function(){
+  const cv=$('#chart');
+  cv.addEventListener('mousemove',ev=>{
+    const r=cv.getBoundingClientRect();
+    C.mx=ev.clientX-r.left;C.my=ev.clientY-r.top;
+    if(C.drag){const cw=clamp(8*C.zoom,2.5,24);C.off=Math.max(0,C.doff+Math.round((ev.clientX-C.dx)/cw));}
+    drawChart();drawSub();
+  });
+  cv.addEventListener('mouseleave',()=>{C.mx=C.my=null;C.drag=false;drawChart();});
+  cv.addEventListener('mousedown',ev=>{C.drag=true;C.dx=ev.clientX;C.doff=C.off;});
+  addEventListener('mouseup',()=>{C.drag=false;});
+  cv.addEventListener('wheel',ev=>{ev.preventDefault();C.zoom=clamp(C.zoom+(ev.deltaY>0?-.12:.12),.3,3);drawAll();},{passive:false});
+  let ts=null;
+  cv.addEventListener('touchstart',ev=>{if(ev.touches.length===1)ts={x:ev.touches[0].clientX,o:C.off};},{passive:true});
+  cv.addEventListener('touchmove',ev=>{
+    if(!ts||ev.touches.length!==1)return;ev.preventDefault();
+    const cw=clamp(8*C.zoom,2.5,24);
+    C.off=Math.max(0,ts.o+Math.round((ev.touches[0].clientX-ts.x)/cw));
+    drawChart();drawSub();
+  },{passive:false});
+  cv.addEventListener('touchend',()=>{ts=null;});
+  $('#symIn').addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter')return;
+    let v=$('#symIn').value.toUpperCase().trim();
+    if(!/(USDT|USDC|BTC|ETH)$/.test(v))v+='USDT';
+    $('#symIn').value=v;C.sym=v;loadChart();
+  });
+  $$('#tfs button').forEach(b=>b.addEventListener('click',()=>{
+    $$('#tfs button').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));
+    C.tf=b.dataset.tf;loadChart();
+  }));
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(drawAll,120);});
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   PART 2 — ACCOUNT REVIEW
+   ═══════════════════════════════════════════════════════════════ */
+const R={mode:'api',trades:[],balance:null,busy:false};
+
+function reportSetup(err){
+  $('#report').innerHTML=`
+  <div class="setup">
+    <h2>Pull your trading history</h2>
+    <p>This reads closed futures trades and reconstructs each round trip — entry, exit, size, duration, fees — then looks for the patterns that cost you money. Nothing is uploaded anywhere; the request goes from your browser straight to Binance.</p>
+    <div class="modes" role="tablist">
+      <button role="tab" data-mode="api" aria-selected="${R.mode==='api'}">Binance API</button>
+      <button role="tab" data-mode="csv" aria-selected="${R.mode==='csv'}">Upload export</button>
+    </div>
+    <div id="modeBody"></div>
+    ${err?`<div class="err">${err}</div>`:''}
+  </div>`;
+  $$('.modes button').forEach(b=>b.addEventListener('click',()=>{R.mode=b.dataset.mode;reportSetup();}));
+  renderMode();
+}
+function renderMode(){
+  const b=$('#modeBody');
+  if(R.mode==='api'){
+    b.innerHTML=`
+      <div class="row2">
+        <div class="field"><label for="ak">API key</label><input id="ak" placeholder="read-only key" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="sk">Secret key</label><input id="sk" type="password" placeholder="secret" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="days">Days to review</label><input id="days" type="number" value="60" min="7" max="180"></div>
+        <div class="field"><label for="bal">Account size (USDT)</label><input id="bal" type="number" value="2000" min="1"></div>
+      </div>
+      <button class="go" id="runApi">Run review</button>
+      <p class="note"><strong>Create the key with read-only permission.</strong> Turn off trading and withdrawals, and whitelist your IP. A read-only key can't move your money even if it leaks. The key stays in this browser tab and is never stored or transmitted anywhere except Binance.</p>
+      <p class="note">If the request is blocked by your browser or your IP isn't whitelisted, use the upload tab instead — Binance lets you export trade history from Orders → Trade History → Export.</p>`;
+    $('#runApi').addEventListener('click',runApi);
+  } else {
+    b.innerHTML=`
+      <div class="field"><label for="bal2">Account size (USDT)</label><input id="bal2" type="number" value="2000" min="1"></div>
+      <div class="drop" id="drop">Drop your Binance trade-history export here, or click to choose a file<br><span style="font-size:11.5px;color:var(--type-dim)">CSV or XLSX-exported CSV. Futures trade history works best.</span></div>
+      <input type="file" id="file" accept=".csv,.txt" hidden>
+      <p class="note">In Binance: <strong>Orders → Futures Order → Trade History → Export</strong>. Pick the widest date range available, then drop the file here.</p>`;
+    const d=$('#drop'),f=$('#file');
+    d.addEventListener('click',()=>f.click());
+    d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('over');});
+    d.addEventListener('dragleave',()=>d.classList.remove('over'));
+    d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('over');if(e.dataTransfer.files[0])readCSV(e.dataTransfer.files[0]);});
+    f.addEventListener('change',()=>{if(f.files[0])readCSV(f.files[0]);});
+  }
+}
+
+/* ── HMAC signing ── */
+async function sign(q,secret){
+  const enc=new TextEncoder();
+  const k=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const s=await crypto.subtle.sign('HMAC',k,enc.encode(q));
+  return Array.from(new Uint8Array(s)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function signed(base,path,params,key,secret){
+  const q=new URLSearchParams({...params,timestamp:Date.now(),recvWindow:60000}).toString();
+  const sig=await sign(q,secret);
+  const r=await fetch(`${base}${path}?${q}&signature=${sig}`,{headers:{'X-MBX-APIKEY':key}});
+  if(!r.ok){
+    let m='HTTP '+r.status;
+    try{const j=await r.json();if(j.msg)m=j.msg+(j.code?` (code ${j.code})`:'');}catch(e){}
+    throw new Error(m);
+  }
+  return r.json();
+}
+
+async function runApi(){
+  if(R.busy)return;
+  const key=$('#ak').value.trim(), sec=$('#sk').value.trim();
+  const days=clamp(+$('#days').value||60,7,180);
+  R.balance=+$('#bal').value||2000;
+  if(!key||!sec)return reportSetup('Enter both the API key and the secret.');
+  if(!crypto.subtle)return reportSetup('Your browser is blocking the crypto API needed to sign requests. Use the upload tab instead.');
+
+  R.busy=true;
+  const btn=$('#runApi'); btn.disabled=true; btn.innerHTML='<span class="spinner dark"></span> Reading history';
+
+  try{
+    const base='https://fapi.binance.com';
+    const end=Date.now(), start=end-days*864e5;
+
+    // 1. income history → which symbols were actually traded
+    let income=[];
+    for(let w=start; w<end; w+=7*864e5){
+      const chunk=await signed(base,'/fapi/v1/income',
+        {startTime:w,endTime:Math.min(w+7*864e5,end),limit:1000},key,sec);
+      income=income.concat(chunk);
+    }
+    const symbols=[...new Set(income.filter(i=>i.symbol).map(i=>i.symbol))];
+    if(!symbols.length)throw new Error(`No futures activity found in the last ${days} days.`);
+
+    // 2. fills per symbol → reconstruct round trips
+    let fills=[];
+    for(const s of symbols){
+      try{
+        const t=await signed(base,'/fapi/v1/userTrades',{symbol:s,startTime:start,endTime:end,limit:1000},key,sec);
+        fills=fills.concat(t.map(x=>({
+          symbol:x.symbol,time:+x.time,side:x.side,price:+x.price,qty:+x.qty,
+          pnl:+x.realizedPnl,fee:+x.commission
+        })));
+      }catch(e){/* skip symbol */}
+    }
+    if(!fills.length)throw new Error('Trades could not be read. The key may lack read permission on futures.');
+
+    const funding=sum(income.filter(i=>i.incomeType==='FUNDING_FEE').map(i=>+i.income));
+    R.trades=buildTrades(fills);
+    R.trades.fundingTotal=funding;
+    if(!R.trades.length)throw new Error('No completed round trips found. Open positions are excluded until they close.');
+    renderReport();
+  }catch(e){
+    reportSetup(`${e.message}<br><br>If this mentions IP, signature, or permission, check the key settings on Binance. If it mentions the network or CORS, switch to the upload tab — that route always works.`);
+  }
+  R.busy=false;
+}
+
+/* ── CSV ── */
+function readCSV(file){
+  R.balance=+$('#bal2').value||2000;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const fills=parseCSV(fr.result);
+      if(!fills.length)throw new Error('No usable rows found. The export needs columns for date, symbol, side, price and quantity.');
+      R.trades=buildTrades(fills);
+      R.trades.fundingTotal=0;
+      if(!R.trades.length)throw new Error('No completed round trips found in this file.');
+      renderReport();
+    }catch(e){reportSetup(e.message);}
+  };
+  fr.onerror=()=>reportSetup('That file could not be read.');
+  fr.readAsText(file);
+}
+function splitLine(l){
+  const out=[];let cur='',q=false;
+  for(const ch of l){
+    if(ch==='"'){q=!q;continue;}
+    if(ch===','&&!q){out.push(cur);cur='';continue;}
+    cur+=ch;
+  }
+  out.push(cur);return out.map(x=>x.trim());
+}
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2)return [];
+  const head=splitLine(lines[0]).map(h=>h.toLowerCase());
+  const find=(...ns)=>head.findIndex(h=>ns.some(n=>h.includes(n)));
+  const iT=find('date','time'), iS=find('symbol','pair','contract'),
+        iSide=find('side','direction'), iP=find('price'), iQ=find('quantity','qty','amount','size'),
+        iPnl=find('realized profit','realized pnl','profit','pnl'), iF=find('fee','commission');
+  if(iT<0||iS<0||iSide<0||iP<0||iQ<0)return [];
+  const num=v=>{const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0;};
+  return lines.slice(1).map(l=>{
+    const c=splitLine(l); if(c.length<3)return null;
+    const t=Date.parse(c[iT].includes('T')?c[iT]:c[iT].replace(' ','T')+'Z');
+    if(!isFinite(t))return null;
+    const sideRaw=(c[iSide]||'').toUpperCase();
+    return {symbol:c[iS],time:t,
+      side:sideRaw.includes('BUY')||sideRaw.includes('LONG')?'BUY':'SELL',
+      price:num(c[iP]),qty:Math.abs(num(c[iQ])),
+      pnl:iPnl>=0?num(c[iPnl]):0, fee:iF>=0?Math.abs(num(c[iF])):0};
+  }).filter(x=>x&&x.qty>0&&x.price>0);
+}
+
+/* ── Round-trip reconstruction ── */
+function buildTrades(fills){
+  fills.sort((a,b)=>a.time-b.time);
+  const bySym={};
+  fills.forEach(f=>{(bySym[f.symbol]=bySym[f.symbol]||[]).push(f);});
+  const trades=[];
+  for(const sym in bySym){
+    let pos=0, open=null;
+    for(const f of bySym[sym]){
+      const signed_=f.side==='BUY'?f.qty:-f.qty;
+      if(pos===0){
+        open={symbol:sym,dir:signed_>0?'LONG':'SHORT',openTime:f.time,
+          entryQty:0,entryNotional:0,exitQty:0,exitNotional:0,pnl:0,fee:0};
+      }
+      if(!open)continue;
+      const opening = (pos>=0&&signed_>0)||(pos<=0&&signed_<0);
+      if(opening){open.entryQty+=f.qty;open.entryNotional+=f.qty*f.price;}
+      else{open.exitQty+=f.qty;open.exitNotional+=f.qty*f.price;}
+      open.pnl+=f.pnl; open.fee+=f.fee;
+      pos+=signed_;
+      if(Math.abs(pos)<1e-10){
+        pos=0;
+        open.closeTime=f.time;
+        open.entry=open.entryQty>0?open.entryNotional/open.entryQty:0;
+        open.exit=open.exitQty>0?open.exitNotional/open.exitQty:0;
+        open.notional=open.entryNotional;
+        open.held=open.closeTime-open.openTime;
+        open.net=open.pnl-open.fee;
+        open.retPct=open.notional>0?open.net/open.notional*100:0;
+        if(open.entry>0&&open.exit>0)trades.push(open);
+        open=null;
+      }
+    }
+  }
+  return trades.sort((a,b)=>a.closeTime-b.closeTime);
+}
+
+/* ═══ DIAGNOSIS ═══ */
+function diagnose(T,balance){
+  const n=T.length;
+  const wins=T.filter(t=>t.net>0), losses=T.filter(t=>t.net<=0);
+  const net=sum(T.map(t=>t.net));
+  const fees=sum(T.map(t=>t.fee));
+  const funding=T.fundingTotal||0;
+  const notionals=T.map(t=>t.notional);
+  const medNot=median(notionals);
+  const winRate=n?wins.length/n*100:0;
+  const avgWinPct=avg(wins.map(t=>t.retPct));
+  const avgLossPct=Math.abs(avg(losses.map(t=>t.retPct)));
+  const payoff=avgLossPct>0?avgWinPct/avgLossPct:0;
+  const expectancyR=(winRate/100)*payoff-(1-winRate/100);
+
+  // equity curve + drawdown
+  let eq=0,peak=0,maxDD=0;
+  const curve=T.map(t=>{eq+=t.net;peak=Math.max(peak,eq);maxDD=Math.max(maxDD,peak-eq);return eq;});
+
+  const cv=medNot>0?stdev(notionals)/avg(notionals):0;
+  const longs=T.filter(t=>t.dir==='LONG').length;
+  const longPct=n?longs/n*100:0;
+
+  // size after loss vs after win
+  const afterLoss=[],afterWin=[];
+  for(let i=1;i<n;i++){(T[i-1].net<=0?afterLoss:afterWin).push(T[i]);}
+  const sizeAfterLoss=avg(afterLoss.map(t=>t.notional));
+  const sizeAfterWin=avg(afterWin.map(t=>t.notional));
+  const escalation=sizeAfterWin>0?sizeAfterLoss/sizeAfterWin:1;
+
+  // quick re-entry after a loss
+  const quick=[];
+  for(let i=1;i<n;i++){
+    if(T[i-1].net<=0 && (T[i].openTime-T[i-1].closeTime)<90*6e4) quick.push(T[i]);
+  }
+  const quickPnl=sum(quick.map(t=>t.net));
+  const quickWR=quick.length?quick.filter(t=>t.net>0).length/quick.length*100:0;
+
+  // after 2+ consecutive losses
+  const tilt=[];let streak=0;
+  for(let i=0;i<n;i++){
+    if(streak>=2)tilt.push(T[i]);
+    streak = T[i].net<=0 ? streak+1 : 0;
+  }
+  const tiltPnl=sum(tilt.map(t=>t.net));
+
+  const holdWin=median(wins.map(t=>t.held)), holdLoss=median(losses.map(t=>t.held));
+
+  /* counterfactuals — concrete dollar costs */
+  const flatPnl=sum(T.map(t=>t.notional>0?t.net*(medNot/t.notional):0));
+  const sizingCost=flatPnl-net;
+
+  const targetWinPct=avgLossPct*2;
+  const asymPnl=sum(T.map(t=>{
+    if(t.net<=0)return t.net;
+    return t.notional*(targetWinPct/100)-t.fee;
+  }));
+  const asymCost=asymPnl-net;
+
+  const noQuickPnl=net-quickPnl;
+  const revengeCost=quick.length?-quickPnl:0;
+
+  const F=[];
+  const push=(sev,title,cost,measures,body,fix)=>F.push({sev,title,cost,measures,body,fix});
+
+  // 1. size discipline
+  if(cv>0.35){
+    push('crit','Position size is set by feeling, not by risk', sizingCost>0?sizingCost:null,
+      [['Size variation',(cv*100).toFixed(0)+'%'],['Smallest',money(Math.min(...notionals))],['Largest',money(Math.max(...notionals))],['Typical',money(medNot)]],
+      `Your position sizes swing by ${(cv*100).toFixed(0)}% around their own average, and the largest is ${(Math.max(...notionals)/Math.min(...notionals)).toFixed(1)} times the smallest. That means the amount you risk has no fixed relationship to your account — it tracks how you felt at the moment of entry.` +
+      (sizingCost>0?` Had every one of these same trades been taken at your typical size, the account would be ${money(sizingCost)} better off. The setups were not the problem; the sizing was.`:` The direction of that effect happened to be mild over this sample, but it is luck, not control.`),
+      `Fix the risk, let the size follow. Decide the loss you accept per trade — 1% of balance, so ${money(balance*0.01)} at ${money(balance)} — then set position size to that risk divided by the distance to your stop. A 4% stop gives you ${money(balance*0.01/0.04)}; an 8% stop gives you ${money(balance*0.01/0.08)}. Same risk, different size.`);
+  } else {
+    push('good','Position sizing is reasonably consistent',null,
+      [['Size variation',(cv*100).toFixed(0)+'%'],['Typical',money(medNot)]],
+      `Sizes cluster within ${(cv*100).toFixed(0)}% of their average, which means something stable is driving them. Keep it.`,null);
+  }
+
+  // 2. escalation after loss
+  if(escalation>1.2&&afterLoss.length>=4){
+    push('crit','You size up after losing', afterLoss.length?-Math.min(0,sum(afterLoss.map(t=>t.net))):null,
+      [['After a loss',money(sizeAfterLoss)],['After a win',money(sizeAfterWin)],['Ratio',escalation.toFixed(2)+'×'],['Result of those trades',money(sum(afterLoss.map(t=>t.net)))]],
+      `Trades opened after a loss are ${escalation.toFixed(2)} times larger than trades opened after a win. This is the mechanism that turns a bad day into a bad month: the position placed to recover is the one entered while agitated, on a setup you went looking for rather than waited for, at a size chosen by the size of the hole rather than by the chart.` +
+      ` Across ${afterLoss.length} such trades the net result was ${money(sum(afterLoss.map(t=>t.net)))}.`,
+      `Make size blind to the last outcome. Risk the same fixed percentage whether you are up or down, and never look at the day's P&L while sizing. If you catch yourself computing what it would take to get back to even, that is the signal to close the platform, not to place the order.`);
+  }
+
+  // 3. win/loss asymmetry
+  if(payoff<1.3&&wins.length>=3&&losses.length>=3){
+    push(payoff<0.9?'crit':'warn','Winners are closed earlier than losers', asymCost>0?asymCost:null,
+      [['Average win',pctStr(avgWinPct,2)],['Average loss',pctStr(-avgLossPct,2)],['Payoff ratio',payoff.toFixed(2)+':1'],['Win rate',winRate.toFixed(0)+'%']],
+      `You win ${winRate.toFixed(0)}% of the time, which is a genuinely respectable hit rate — and you are still ${net<0?'losing money':'barely ahead'}. The reason is the payoff ratio: your average winner is ${payoff.toFixed(2)} times your average loser, when it needs to exceed roughly ${(1/(winRate/100)-1).toFixed(2)} just to break even at that hit rate.` +
+      ` Winners are being cut at ${avgWinPct.toFixed(2)}% while losers are allowed to reach ${avgLossPct.toFixed(2)}%. You are reading direction well and then paying yourself less than you pay the market.` +
+      (asymCost>0?` If winners had simply been held to twice the size of your average loss, this same set of trades would have produced ${money(asymCost)} more.`:''),
+      `Set both exits before entry and stop deciding afterwards. Take half off at two times your stop distance and move the stop to breakeven at that instant — from then on the trade cannot lose, which is what removes the urge to close it. Trail the rest under 4h swing lows. A red candle is not an exit; a broken swing low is.`);
+  } else if(payoff>=1.3){
+    push('good','Payoff ratio is healthy',null,
+      [['Average win',pctStr(avgWinPct,2)],['Average loss',pctStr(-avgLossPct,2)],['Payoff',payoff.toFixed(2)+':1']],
+      `Winners average ${payoff.toFixed(2)} times losers. This is the ratio most traders never achieve, and it is what lets a modest win rate compound.`,null);
+  }
+
+  // 4. hold time asymmetry
+  if(wins.length>=3&&losses.length>=3&&holdWin<holdLoss*0.75){
+    push('warn','Losers are held longer than winners',null,
+      [['Winner held',dur(holdWin)],['Loser held',dur(holdLoss)],['Ratio',(holdLoss/holdWin).toFixed(1)+'×']],
+      `Your typical losing trade is kept open ${(holdLoss/holdWin).toFixed(1)} times longer than your typical winner. That ordering is exactly backwards from a profitable process, and it is the time-domain version of the payoff problem: uncertainty about a winner feels like risk, while uncertainty about a loser feels like hope.`,
+      `A hard stop resting on the exchange fixes the loser side by removing you from the decision. The winner side is fixed by the scale-out rule — once half is booked and the stop is at breakeven, holding costs you nothing emotionally.`);
+  }
+
+  // 5. revenge timing
+  if(quick.length>=3){
+    push(quickPnl<0?'crit':'warn','Re-entering within 90 minutes of a loss', quickPnl<0?-quickPnl:null,
+      [['Such trades',String(quick.length)],['Their win rate',quickWR.toFixed(0)+'%'],['Baseline win rate',winRate.toFixed(0)+'%'],['Their net',money(quickPnl)]],
+      `${quick.length} trades were opened within ninety minutes of closing a loser. They won ${quickWR.toFixed(0)}% of the time against your ${winRate.toFixed(0)}% baseline, and together produced ${money(quickPnl)}.` +
+      (quickPnl<0?` Removing just these trades would have left the account ${money(-quickPnl)} better off, with no change to your method at all.`:` The damage here was limited this time, but the pattern is the one that precedes most large drawdowns.`),
+      `Impose a cooling gap. After any loss, no new position for at least two hours, and after three losses in a day you are finished for that day. This is not superstition — your own numbers show measurably worse results in that window.`);
+  }
+
+  // 6. tilt sequences
+  if(tilt.length>=3&&tiltPnl<0){
+    push('warn','Trading through losing streaks', -tiltPnl,
+      [['Trades after 2+ losses',String(tilt.length)],['Their net',money(tiltPnl)]],
+      `${tilt.length} trades were taken while already two or more losses deep. They produced ${money(tiltPnl)}. Losing streaks are normal and unavoidable; continuing to trade through them at full size is what turns a normal streak into a drawdown you then feel compelled to recover.`,
+      `Stop for the day after three losses and for the week after six. Write the rule down before the session, because the moment you need it is precisely the moment it will feel unnecessary.`);
+  }
+
+  // 7. direction
+  if(longPct>85&&n>=8){
+    push('warn','Long-only in a market that falls faster than it rises',null,
+      [['Longs',longs+' of '+n],['Share',longPct.toFixed(0)+'%'],['Long net',money(sum(T.filter(t=>t.dir==='LONG').map(t=>t.net)))]],
+      `${longPct.toFixed(0)}% of your trades were longs. On futures, where shorting costs nothing extra, that removes roughly half the available opportunity — and it removes the half that tends to resolve faster, since crypto declines are more compressed in time than advances.`,
+      `Either learn to take the short side of the same setups you already recognise, or accept sitting in cash whenever BTC is below its 50 EMA on the 4h. The second option is entirely respectable and costs nothing; what does not work is taking alt longs regardless of the index.`);
+  }
+
+  // 8. costs
+  const grossAbs=sum(T.map(t=>Math.abs(t.pnl)));
+  const drag=fees+Math.abs(Math.min(0,funding));
+  if(grossAbs>0&&drag/grossAbs>0.12){
+    push('warn','Fees and funding are taking a real share', drag,
+      [['Commissions',money(fees)],['Funding',money(funding)],['Share of gross',(drag/grossAbs*100).toFixed(1)+'%']],
+      `Trading costs came to ${money(drag)}, which is ${(drag/grossAbs*100).toFixed(1)}% of your gross profit and loss. When winners are already being cut short, this share becomes the difference between a thin edge and no edge.`,
+      `Use limit orders to enter where you can — maker fees are lower than taker. On funding: entering long when the rate is already high means paying the crowd every eight hours to hold a position everyone else already has.`);
+  }
+
+  // 9. activity
+  const spanDays=n>1?(T[n-1].closeTime-T[0].openTime)/864e5:1;
+  const perDay=n/Math.max(1,spanDays);
+  const syms=new Set(T.map(t=>t.symbol)).size;
+  if(syms>12){
+    push('warn','Attention spread across too many symbols',null,
+      [['Symbols traded',String(syms)],['Trades',String(n)],['Per symbol',(n/syms).toFixed(1)]],
+      `You traded ${syms} different symbols, averaging ${(n/syms).toFixed(1)} trades in each. Every coin has its own volatility, its own liquidity and its own personality, and ${(n/syms).toFixed(1)} trades is not enough to learn any of them. Scanning widely for a green candle is a different activity from trading a market you understand.`,
+      `Pick five liquid pairs and trade only those for a month. Familiarity with how a specific coin behaves around its levels is a real and underrated edge.`);
+  }
+
+  // sort by cost then severity
+  const rank={crit:0,warn:1,good:2};
+  F.sort((a,b)=>{
+    if(rank[a.sev]!==rank[b.sev])return rank[a.sev]-rank[b.sev];
+    return (b.cost||0)-(a.cost||0);
+  });
+
+  // Costs overlap (the same trade can be both oversized and cut early), so summing
+  // them would double-count. The headline uses the single largest leak instead.
+  const costs=F.filter(f=>f.sev!=='good'&&f.cost>0).map(f=>f.cost);
+  const recoverable=costs.length?Math.max(...costs):0;
+  const topLeak=F.find(f=>f.cost===recoverable&&recoverable>0);
+
+  return {n,net,fees,funding,winRate,avgWinPct,avgLossPct,payoff,expectancyR,maxDD,curve,
+    medNot,cv,longPct,escalation,holdWin,holdLoss,spanDays,perDay,syms,
+    findings:F,recoverable,topLeak,balance,
+    riskPerTradePct:balance>0?medNot/balance*100:0};
+}
+
+function renderReport(){
+  const D=diagnose(R.trades,R.balance);
+  const T=R.trades;
+  const sevCol={crit:'var(--crit)',warn:'var(--warn)',good:'var(--good)'};
+
+  const hero = D.recoverable>0
+    ? `<div class="hero">
+        <div class="hero-eyebrow">Reviewed ${D.n} closed trades over ${Math.round(D.spanDays)} days · net ${money(D.net)}</div>
+        <div class="hero-fig" style="color:var(--crit)">${money(D.recoverable)}</div>
+        <p class="hero-say">is what your single biggest habit cost you — ${D.topLeak?D.topLeak.title.charAt(0).toLowerCase()+D.topLeak.title.slice(1):'see below'}. Same trades, same setups, one behaviour changed. Everything below is ordered by what it cost.</p>
+      </div>`
+    : `<div class="hero">
+        <div class="hero-eyebrow">Reviewed ${D.n} closed trades over ${Math.round(D.spanDays)} days</div>
+        <div class="hero-fig" style="color:${D.net>=0?'var(--good)':'var(--crit)'}">${money(D.net)}</div>
+        <p class="hero-say">No single behavioural leak dominates this sample. The detail below still shows where the process is loose.</p>
+      </div>`;
+
+  const vital=(k,v,n,c)=>`<div class="vital"><div class="vital-k">${k}</div>
+    <div class="vital-v"${c?` style="color:${c}"`:''}>${v}</div>${n?`<div class="vital-n">${n}</div>`:''}</div>`;
+
+  const vitals=`<div class="vitals">
+    ${vital('Win rate',D.winRate.toFixed(0)+'%',`${Math.round(D.n*D.winRate/100)} of ${D.n}`)}
+    ${vital('Payoff ratio',D.payoff.toFixed(2)+':1','win size ÷ loss size',D.payoff>=1.3?'var(--good)':'var(--crit)')}
+    ${vital('Expectancy',D.expectancyR.toFixed(2)+'R','per trade',D.expectancyR>0?'var(--good)':'var(--crit)')}
+    ${vital('Deepest drawdown',money(D.maxDD),'peak to trough')}
+    ${vital('Typical risk','~'+D.riskPerTradePct.toFixed(1)+'%','of account per trade',D.riskPerTradePct>5?'var(--crit)':D.riskPerTradePct>2?'var(--warn)':'var(--good)')}
+    ${vital('Costs',money(D.fees+Math.abs(Math.min(0,D.funding))),'fees and funding')}
+  </div>`;
+
+  const findings=D.findings.map(f=>`
+    <div class="finding">
+      <div class="finding-top">
+        <div class="sev" style="background:${sevCol[f.sev]}"></div>
+        <div class="finding-body">
+          <div class="finding-title"><span>${f.title}</span>
+            ${f.cost?`<span class="cost" style="color:var(--crit)">${money(f.cost)}</span>`:''}</div>
+          ${f.measures?`<div class="measure">${f.measures.map(([k,v])=>
+            `<div><div class="measure-k">${k}</div><div class="measure-v">${v}</div></div>`).join('')}</div>`:''}
+          <p>${f.body}</p>
+          ${f.fix?`<div class="fix"><div class="fix-k">What to change</div><p>${f.fix}</p></div>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  const worst=[...T].sort((a,b)=>a.net-b.net).slice(0,8);
+  const table=`<div class="scroll"><table class="trades">
+    <thead><tr><th>Symbol</th><th>Side</th><th class="num">Size</th><th class="num">Held</th><th class="num">Return</th><th class="num">Net</th></tr></thead>
+    <tbody>${worst.map(t=>`<tr>
+      <td>${t.symbol}</td><td>${t.dir}</td>
+      <td class="num">${money(t.notional)}</td>
+      <td class="num">${dur(t.held)}</td>
+      <td class="num" style="color:${t.retPct>=0?'var(--good)':'var(--crit)'}">${pctStr(t.retPct,2)}</td>
+      <td class="num" style="color:${t.net>=0?'var(--good)':'var(--crit)'}">${money(t.net)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+
+  $('#report').innerHTML = hero + vitals
+    + `<h2 class="section-head">What the trades show</h2>
+       <p class="section-sub">Each finding is measured from your own fills. Where a dollar figure appears, it is the difference between what happened and what the same trades would have produced without that specific behaviour — the setups held constant.</p>`
+    + findings
+    + `<h2 class="section-head" style="margin-top:34px">Your eight worst trades</h2>
+       <p class="section-sub">Sorted by loss. Look at the size column against the others — outliers here usually mark the recovery attempts.</p>`
+    + table
+    + `<p class="disc">Reconstructed from ${T.length} closed round trips. Open positions are excluded. Risk percentages use the account size you entered, so they are approximate unless that figure matched your balance across the whole period. This is a review of your own recorded behaviour, not advice about what to trade next — and none of it forecasts anything.</p>`
+    + `<button class="go" id="again" style="margin-top:22px">Review a different period</button>`;
+
+  $('#again').addEventListener('click',()=>reportSetup());
+  $('#reportView').scrollTop=0;
+}
+
+/* ═══ BOOT ═══ */
+reportSetup();
+loadChart();
+</script>
+</body>
+</html>
